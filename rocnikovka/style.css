@@ -1,0 +1,41 @@
+html, body {
+    width: 350px;
+    height: 500px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+body { 
+    font-family: sans-serif; 
+    background: #f8fafc; 
+    color: #334155; 
+}
+
+.app-container { 
+    width: 100%; 
+    height: 100%; 
+    padding: 15px; 
+    box-sizing: border-box; 
+    display: flex; 
+    flex-direction: column; 
+}
+
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+h1 { font-size: 18px; margin: 0; color: #4f46e5; }
+.badge { background: gold; color: black; font-size: 10px; padding: 2px 5px; border-radius: 4px; vertical-align: middle; }
+.hidden { display: none !important; }
+
+input { width: 100%; padding: 10px; margin-bottom: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+input:focus { outline: 2px solid #4f46e5; }
+
+.btn { width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 5px; }
+.btn-primary { background: #4f46e5; color: white; }
+.btn-secondary { background: #e2e8f0; color: #334155; }
+
+.error { color: #ef4444; font-size: 12px; margin-top: 5px; text-align: center; height: 15px;}
+.switch-link { text-align: center; margin-top: 15px; font-size: 12px; }
+
+.vault-item { background: white; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+.icon-btn { background: none; border: none; cursor: pointer; font-size: 18px; padding: 5px; }
+.icon-btn:hover { transform: scale(1.2); }

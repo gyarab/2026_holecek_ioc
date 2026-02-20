@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "FoxPass",
+  "version": "1.0",
+  "description": "ecrypted password manager",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://fxevhmvpwgejricjjmkm.supabase.co/*",
+    "<all_urls>"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://fxevhmvpwgejricjjmkm.supabase.co"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "foxpass-cloud@moje-id",
+      "strict_min_version": "109.0"
+    }
+  },
+  "action": {
+    "default_popup": "index.html",
+    "default_icon": "icon.jpg"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}
