@@ -1,141 +1,194 @@
-const PROJECT_URL = "https://fxevhmvpwgejricjjmkm.supabase.co";
-const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4ZXZobXZwd2dlanJpY2pqbWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5MzEzMDUsImV4cCI6MjA4MjUwNzMwNX0.JHq1ywJEsKkSNce5e1cAPiW6ksurIA-koYcvHo678f4";
-const AUTH_URL = `${PROJECT_URL}/auth/v1`;
-const DB_URL = `${PROJECT_URL}/rest/v1/vaults`;
+const ADRESA_API = "https://fxevhmvpwgejricjjmkm.supabase.co";
+const VEREJNY_KLIC = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4ZXZobXZwd2dlanJpY2pqbWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5MzEzMDUsImV4cCI6MjA4MjUwNzMwNX0.JHq1ywJEsKkSNce5e1cAPiW6ksurIA-koYcvHo678f4";
+const AUTH_CESTA = `${ADRESA_API}/auth/v1`;
+const DATA_CESTA = `${ADRESA_API}/rest/v1/vaults`;
 
-let isRegisterMode = false;
+let jeRegistrace = false;
 
-document.getElementById("toggle-mode").onclick = (e) => {
-    e.preventDefault();
-    isRegisterMode = !isRegisterMode;
-    document.getElementById("auth-title").innerText = isRegisterMode ? "Registrace" : "Přihlášení";
-    document.getElementById("btn-submit").innerText = isRegisterMode ? "registrovat" : "přihlásit";
-    document.getElementById("toggle-mode").innerText = isRegisterMode ? "zpět na přihlášení" : "registrace";
+document.getElementById("toggle-mode").onclick = (udalost) => {
+    udalost.preventDefault();
+    jeRegistrace = !jeRegistrace;
+    document.getElementById("auth-title").innerText = jeRegistrace ? "Nová registrace" : "Přihlášení uživatele";
+    document.getElementById("btn-submit").innerText = jeRegistrace ? "registrovat" : "přihlásit";
+    document.getElementById("toggle-mode").innerText = jeRegistrace ? "už mám účet" : "chci se registrovat";
     document.getElementById("error-msg").innerText = "";
 };
 
-async function renderVault() {
-    const vaultList = document.getElementById("vault-list");
-    vaultList.innerHTML = "";
-    const storage = await chrome.storage.local.get("vaultData");
-    const data = storage.vaultData || [];
+async function udelejHash(text) {
+    const kodovac = new TextEncoder();
+    const buffer = await crypto.subtle.digest("SHA-256", kodovac.encode(text));
+    return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
-    data.forEach(item => {
+async function vytvorKlic(heslo, sul) {
+    const kodovac = new TextEncoder();
+    const zaklad = await crypto.subtle.importKey("raw", kodovac.encode(heslo), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: sul, iterations: 100000, hash: "SHA-256" },
+        zaklad,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+    );
+}
+
+async function zasifruj(data, heslo) {
+    const sul = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const klic = await vytvorKlic(heslo, sul);
+    const kodovac = new TextEncoder();
+    const zasifrovano = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, klic, kodovac.encode(JSON.stringify(data)));
+    return {
+        obsah: btoa(String.fromCharCode(...new Uint8Array(zasifrovano))),
+        s: btoa(String.fromCharCode(...sul)),
+        v: btoa(String.fromCharCode(...iv))
+    };
+}
+
+async function odsifruj(objekt, heslo) {
+    try {
+        const sul = new Uint8Array(atob(objekt.s).split("").map(c => c.charCodeAt(0)));
+        const iv = new Uint8Array(atob(objekt.v).split("").map(c => c.charCodeAt(0)));
+        const zasifrovano = new Uint8Array(atob(objekt.obsah).split("").map(c => c.charCodeAt(0)));
+        const klic = await vytvorKlic(heslo, sul);
+        const de_buffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, klic, zasifrovano);
+        return JSON.parse(new TextDecoder().decode(de_buffer));
+    } catch (chyba) {
+        return [];
+    }
+}
+
+async function prekresliSeznam() {
+    const seznam = document.getElementById("vault-list");
+    seznam.innerHTML = "";
+    const uloziste = await chrome.storage.local.get("vaultData");
+    const polozky = uloziste.vaultData || [];
+
+    polozky.forEach(p => {
         const div = document.createElement("div");
         div.className = "vault-item";
         div.innerHTML = `
             <div>
-                <strong>${item.site}</strong><br>
-                <small>${item.login}</small><br>
-                <small>${item.pass}</small>
+                <strong>${p.site}</strong>  
+
+                <small>${p.login}</small>  
+
+                <small>${p.pass}</small>
             </div>
         `;
-        vaultList.appendChild(div);
+        seznam.appendChild(div);
     });
 }
 
 document.getElementById("btn-submit").onclick = async () => {
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
-    const errorMsg = document.getElementById("error-msg");
-    errorMsg.innerText = "";
+    const mail = document.getElementById("email").value.trim();
+    const heslo = document.getElementById("password").value;
+    const chyba_box = document.getElementById("error-msg");
+    chyba_box.innerText = "";
 
-    if (!email || !password) {
-        errorMsg.innerText = "Vyplňte email i heslo.";
+    if (!mail || !heslo) {
+        chyba_box.innerText = "Vyplň všechna pole!";
         return;
     }
 
-    document.getElementById("auth-sub").innerText = isRegisterMode ? "Registrace" : "Ověřování";
+    document.getElementById("auth-sub").innerText = jeRegistrace ? "Registruji..." : "Ověřuji...";
 
     try {
-        const endpoint = isRegisterMode ? `${AUTH_URL}/signup` : `${AUTH_URL}/token?grant_type=password`;
-        const res = await fetch(endpoint, {
+        const hashProAuth = await udelejHash(heslo);
+        const url = jeRegistrace ? `${AUTH_CESTA}/signup` : `${AUTH_CESTA}/token?grant_type=password`;
+        const odpoved = await fetch(url, {
             method: "POST",
-            headers: { "apikey": ANON_KEY, "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password })
+            headers: { "apikey": VEREJNY_KLIC, "Content-Type": "application/json" },
+            body: JSON.stringify({ email: mail, password: hashProAuth })
         });
 
-        const authData = await res.json();
+        const vysledek = await odpoved.json();
 
-        if (!res.ok) throw new Error(authData.error_description || authData.msg || "chyba autentizace");
+        if (!odpoved.ok) throw new Error(vysledek.error_description || vysledek.msg || "Chyba při auth");
 
-        if (isRegisterMode) {
-            alert("Registrace úspěšná ted se přihlaste.");
+        if (jeRegistrace) {
+            alert("Registrace proběhla, teď se přihlas.");
             document.getElementById("toggle-mode").click();
             return;
         }
 
-        const accessToken = authData.access_token;
+        const token = vysledek.access_token;
 
-        const dbRes = await fetch(`${DB_URL}?user_email=eq.${email}`, {
-            headers: { "apikey": ANON_KEY, "Authorization": `Bearer ${accessToken}`, "Content-Type": "application/json" }
+        const db_odpoved = await fetch(`${DATA_CESTA}?user_email=eq.${mail}`, {
+            headers: { "apikey": VEREJNY_KLIC, "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
         });
 
-        if (!dbRes.ok) throw new Error("Chyba při stahování dat");
-        const users = await dbRes.json();
+        if (!db_odpoved.ok) throw new Error("Nepodařilo se stáhnout data");
+        const radky = await db_odpoved.json();
 
-        let vaultData = (users.length > 0 && users[0].encrypted_data) ? users[0].encrypted_data : [];
+        let desifrovanaData = [];
+        if (radky.length > 0 && radky[0].encrypted_data) {
+            desifrovanaData = await odsifruj(radky[0].encrypted_data, heslo);
+        }
 
-        await chrome.storage.local.set({ vaultData: vaultData, currentUser: email, token: accessToken });
+        await chrome.storage.local.set({ vaultData: desifrovanaData, currentUser: mail, token: token, masterKey: heslo });
 
         document.getElementById("screen-auth").classList.add("hidden");
         document.getElementById("screen-vault").classList.remove("hidden");
         document.getElementById("btn-logout").classList.remove("hidden");
         document.getElementById("btn-logout").innerText = "Odhlásit";
-        renderVault();
+        prekresliSeznam();
 
-    } catch (err) {
-        errorMsg.innerText = err.message;
-        document.getElementById("auth-sub").innerText = "Chyba";
+    } catch (e) {
+        chyba_box.innerText = e.message;
+        document.getElementById("auth-sub").innerText = "Chyba!";
     }
 };
 
 document.getElementById("btn-save").onclick = async () => {
-    const site = document.getElementById("site").value;
-    const login = document.getElementById("login").value;
+    const web = document.getElementById("site").value;
+    const jmeno = document.getElementById("login").value;
     const pass = document.getElementById("pass").value;
 
-    if (!site || !pass) return alert("Vyplňte web a heslo");
+    if (!web || !pass) return alert("Musíš vyplnit web a heslo!");
 
     try {
-        const storage = await chrome.storage.local.get(["currentUser", "vaultData", "token"]);
-        const email = storage.currentUser;
-        const token = storage.token;
+        const stav = await chrome.storage.local.get(["currentUser", "vaultData", "token", "masterKey"]);
+        const uzivatel = stav.currentUser;
+        const token = stav.token;
+        const klic = stav.masterKey;
 
-        if (!email || !token) return alert("User není přihlášen");
+        if (!uzivatel || !token || !klic) return alert("Nejsi přihlášený!");
 
         document.getElementById("loading").classList.remove("hidden");
 
-        let vaultData = storage.vaultData || [];
-        vaultData.push({ site, login, pass });
+        let data = stav.vaultData || [];
+        data.push({ site: web, login: jmeno, pass: pass });
 
-        const headers = { "apikey": ANON_KEY, "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
+        const zasifrovanyBalik = await zasifruj(data, klic);
 
-        const res = await fetch(`${DB_URL}?user_email=eq.${email}`, { headers });
-        const users = await res.json();
+        const hlavicky = { "apikey": VEREJNY_KLIC, "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
 
-        const method = users.length > 0 ? "PATCH" : "POST";
-        const query = users.length > 0 ? `?user_email=eq.${email}` : "";
+        const kontrola = await fetch(`${DATA_CESTA}?user_email=eq.${uzivatel}`, { headers: hlavicky });
+        const existujici = await kontrola.json();
 
-        const saveRes = await fetch(DB_URL + query, {
-            method: method,
-            headers: headers,
-            body: JSON.stringify({ user_email: email, encrypted_data: vaultData })
+        const metoda = existujici.length > 0 ? "PATCH" : "POST";
+        const cil = existujici.length > 0 ? `?user_email=eq.${uzivatel}` : "";
+
+        const finalni_ulozeni = await fetch(DATA_CESTA + cil, {
+            method: metoda,
+            headers: hlavicky,
+            body: JSON.stringify({ user_email: uzivatel, encrypted_data: zasifrovanyBalik })
         });
 
-        if (!saveRes.ok) throw new Error("Chyba při ukládání do database");
+        if (!finalni_ulozeni.ok) throw new Error("Ukládání na cloud selhalo");
 
-        await chrome.storage.local.set({ vaultData: vaultData });
+        await chrome.storage.local.set({ vaultData: data });
 
         document.getElementById("loading").classList.add("hidden");
         document.getElementById("site").value = "";
         document.getElementById("login").value = "";
         document.getElementById("pass").value = "";
 
-        renderVault();
-    } catch (err) {
+        prekresliSeznam();
+    } catch (e) {
         document.getElementById("loading").classList.add("hidden");
-        alert(err.message);
+        alert(e.message);
     }
 };
 
@@ -146,6 +199,6 @@ document.getElementById("btn-logout").onclick = async () => {
     document.getElementById("screen-auth").classList.remove("hidden");
     document.getElementById("email").value = "";
     document.getElementById("password").value = "";
-    document.getElementById("auth-sub").innerText = "stahování dat";
+    document.getElementById("auth-sub").innerText = "připraveno";
     document.getElementById("error-msg").innerText = "";
 };
