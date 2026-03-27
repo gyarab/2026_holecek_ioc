@@ -18,7 +18,7 @@ document.getElementById("toggle-mode").onclick = (event) => {
 async function vytvorKlic(password, sul) {
     const coder = new TextEncoder(); //Převod hesla na binární pro správnou funkčnost API
     const base = await crypto.subtle.importKey("raw", coder.encode(password), "PBKDF2", false, ["deriveKey"]); //Vezme heslo v binárním formátu a označí ho jako "Raw" pro PDKF2 šifrování
-    return crypto.subtle.deriveKey(/ / / Samotné šifrování hesla
+    return crypto.subtle.deriveKey( //Samotné šifrování hesla
         { name: "PBKDF2", salt: sul, iterations: 100000, hash: "SHA-256" },
         base,
         { name: "AES-GCM", length: 256 },
