@@ -3,11 +3,11 @@ const PUBLIC_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const AUTHENTICATION_PATH = `${PUBLIC_API_KEY}/auth/v1`;
 const DATA_PATH = `${PUBLIC_API_KEY}/rest/v1/vaults`;
 
-let isRegistrated = false;
-let sessionMasterKey = null;
+let isRegistrated = false; //UI podle stavu přihlášení
+let sessionMasterKey = null; //Ukládání hesla do RAM
 
 document.getElementById("toggle-mode").onclick = (event) => {
-    event.preventDefault();
+    event.preventDefault(); //Zabránění obnovení nebo posunutí popup.js
     isRegistrated = !isRegistrated;
     document.getElementById("auth-title").innerText = isRegistrated ? "Signup" : "Login";
     document.getElementById("btn-submit").innerText = isRegistrated ? "Signup" : "Login";
@@ -16,9 +16,9 @@ document.getElementById("toggle-mode").onclick = (event) => {
 };
 
 async function vytvorKlic(password, sul) {
-    const coder = new TextEncoder();
-    const base = await crypto.subtle.importKey("raw", coder.encode(password), "PBKDF2", false, ["deriveKey"]);
-    return crypto.subtle.deriveKey(
+    const coder = new TextEncoder(); //Převod hesla na binární pro správnou funkčnost API
+    const base = await crypto.subtle.importKey("raw", coder.encode(password), "PBKDF2", false, ["deriveKey"]); //Vezme heslo v binárním formátu a označí ho jako "Raw" pro PDKF2 šifrování
+    return crypto.subtle.deriveKey(/ / / Samotné šifrování hesla
         { name: "PBKDF2", salt: sul, iterations: 100000, hash: "SHA-256" },
         base,
         { name: "AES-GCM", length: 256 },
@@ -27,7 +27,7 @@ async function vytvorKlic(password, sul) {
     );
 }
 
-function bufferToBase64(buffer) {
+function bufferToBase64(buffer) { //Převod binárních dat na Base64
     let binary = '';
     const bytes = new Uint8Array(buffer);
     for (let i = 0; i < bytes.byteLength; i++) {
