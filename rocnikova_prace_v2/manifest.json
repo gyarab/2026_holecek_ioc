@@ -1,34 +1,25 @@
 {
   "manifest_version": 3,
   "name": "FoxPass",
-  "version": "2.0",
-  "description": "ecrypted password manager",
+  "version": "2.4",
+  "description": "symetricaly encrypted password manager extension for firefox browser",
   "permissions": [
-    "activeTab",
-    "scripting",
     "storage"
   ],
   "host_permissions": [
-    "https://fxevhmvpwgejricjjmkm.supabase.co/*",
-    "<all_urls>"
+    "https://fxevhmvpwgejricjjmkm.supabase.co/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://fxevhmvpwgejricjjmkm.supabase.co"
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "foxpass.cloud@moje.id",
+      "id": "foxpass.test@my.id",
       "strict_min_version": "109.0"
     }
   },
   "action": {
     "default_popup": "index.html",
     "default_icon": "icon.jpg"
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
-    }
-  ]
+  }
 }
