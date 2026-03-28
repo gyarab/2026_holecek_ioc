@@ -36,12 +36,12 @@ function bufferToBase64(buffer) { //Převod binárních dat na Base64
     return btoa(binary);
 }
 
-async function encrypt(data, password) {
-    const sul = crypto.getRandomValues(new Uint8Array(16));
-    const inicializacni_vector = crypto.getRandomValues(new Uint8Array(12));
-    const key = await vytvorKlic(password, sul);
-    const coder = new TextEncoder();
-    const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv: inicializacni_vector }, key, coder.encode(JSON.stringify(data)));
+async function encrypt(data, password) { //Šifrování dat pomocí AES-GCM
+    const sul = crypto.getRandomValues(new Uint8Array(16)); //Vytvoření náhodného solného řetězce
+    const inicializacni_vector = crypto.getRandomValues(new Uint8Array(12)); //Vytvoření náhodného inicializačního vektoru
+    const key = await vytvorKlic(password, sul); //Vytvoření klíče
+    const coder = new TextEncoder(); //Převod dat na binární
+    const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv: inicializacni_vector }, key, coder.encode(JSON.stringify(data))); //Šifrování dat
     return {
         obsah: bufferToBase64(encrypted),
         s: bufferToBase64(sul),
@@ -49,26 +49,26 @@ async function encrypt(data, password) {
     };
 }
 
-async function decrypt(object, password) {
+async function decrypt(object, password) { //Dešifrování dat pomocí AES-GCM
     try {
-        const sul = new Uint8Array(atob(object.s).split("").map(c => c.charCodeAt(0)));
-        const inicializacni_vector = new Uint8Array(atob(object.v).split("").map(c => c.charCodeAt(0)));
-        const encrypted = new Uint8Array(atob(object.obsah).split("").map(c => c.charCodeAt(0)));
-        const key = await vytvorKlic(password, sul);
-        const de_buffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv: inicializacni_vector }, key, encrypted);
+        const sul = new Uint8Array(atob(object.s).split("").map(c => c.charCodeAt(0))); //Převod solného řetězce z Base64 na binární
+        const inicializacni_vector = new Uint8Array(atob(object.v).split("").map(c => c.charCodeAt(0))); //Převod inicializačního vektoru z Base64 na binární
+        const encrypted = new Uint8Array(atob(object.obsah).split("").map(c => c.charCodeAt(0))); //Převod šifrovaných dat z Base64 na binární
+        const key = await vytvorKlic(password, sul); //Vytvoření klíče
+        const de_buffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv: inicializacni_vector }, key, encrypted); //Dešifrování dat
         return JSON.parse(new TextDecoder().decode(de_buffer));
     } catch (error) {
         return [];
     }
 }
 
-async function printList() {
+async function printList() { //Načtení a zobrazení dat z lokálního úložiště a zobrazení v HTML
     const list = document.getElementById("vault-list");
     list.innerHTML = "";
-    const storage = await chrome.storage.local.get("vaultData");
-    const items = storage.vaultData || [];
+    const storage = await chrome.storage.local.get("vaultData"); //Načtení dat z lokálního úložiště
+    const items = storage.vaultData || []; //Načtení dat z lokálního úložiště
 
-    items.forEach(item => {
+    items.forEach(item => { //Procházení dat
         const itemDiv = document.createElement("div");
         itemDiv.className = "vault-item";
         itemDiv.textContent = `${item.site} | ${item.login} | ${item.pass}`;
@@ -76,7 +76,7 @@ async function printList() {
     });
 }
 
-document.getElementById("btn-submit").onclick = async () => {
+document.getElementById("btn-submit").onclick = async () => { //Přihlášení a registrace
     const rawLogin = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
     const errorBox = document.getElementById("error-msg");
@@ -108,7 +108,7 @@ document.getElementById("btn-submit").onclick = async () => {
             return;
         }
 
-        const token = result.access_token;
+        const token = result.access_token; //Získání tokenu a stažení zašifrovaných dat z databáze
         const dbResponse = await fetch(`${DATA_PATH}?user_email=eq.${email}`, {
             headers: { "apikey": PUBLIC_KEY, "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
         });
@@ -116,12 +116,12 @@ document.getElementById("btn-submit").onclick = async () => {
         if (!dbResponse.ok) throw new Error("Chyba při stahování dat");
         const rows = await dbResponse.json();
 
-        let decryptedData = [];
+        let decryptedData = []; // Dekryptování dat
         if (rows.length > 0 && rows[0].encrypted_data) {
             decryptedData = await decrypt(rows[0].encrypted_data, password);
         }
 
-        sessionMasterKey = password;
+        sessionMasterKey = password; //Uložení hesla do RAM a lokálního úložiště
         await chrome.storage.local.set({ vaultData: decryptedData, currentUser: email, token: token });
 
         document.getElementById("screen-auth").classList.add("hidden");
@@ -134,7 +134,7 @@ document.getElementById("btn-submit").onclick = async () => {
     }
 };
 
-document.getElementById("btn-save").onclick = async () => {
+document.getElementById("btn-save").onclick = async () => { //Přidání dat do databáze a následné zašifrování a uložení na server
     const site = document.getElementById("site").value.trim();
     const login = document.getElementById("login").value.trim();
     const pass = document.getElementById("pass").value;
@@ -153,39 +153,39 @@ document.getElementById("btn-save").onclick = async () => {
 
         document.getElementById("loading").classList.remove("hidden");
 
-        let data = state.vaultData || [];
+        let data = state.vaultData || []; //Přidání dat do pole a následné zašifrování
         data.push({ site: site, login: login, pass: pass });
         const encryptedBundle = await encrypt(data, sessionMasterKey);
 
-        const check = await fetch(`${DATA_PATH}?user_email=eq.${state.currentUser}`, {
+        const check = await fetch(`${DATA_PATH}?user_email=eq.${state.currentUser}`, { //Kontrola zda data existují
             headers: { "apikey": PUBLIC_KEY, "Authorization": `Bearer ${state.token}` }
         });
-        const existing = await check.json();
+        const existing = await check.json(); //Získání dat z databáze
 
-        const method = existing.length > 0 ? "PATCH" : "POST";
+        const method = existing.length > 0 ? "PATCH" : "POST"; //Zjištění zda data existují a podle toho zvolení metody
         const target = existing.length > 0 ? `?user_email=eq.${state.currentUser}` : "";
 
-        const finalSave = await fetch(DATA_PATH + target, {
+        const finalSave = await fetch(DATA_PATH + target, { //Uložení dat do databáze
             method: method,
             headers: { "apikey": PUBLIC_KEY, "Authorization": `Bearer ${state.token}`, "Content-Type": "application/json" },
             body: JSON.stringify({ user_email: state.currentUser, encrypted_data: encryptedBundle })
         });
 
-        if (!finalSave.ok) throw new Error("Uložení na server selhalo");
+        if (!finalSave.ok) throw new Error("Uložení na server selhalo"); //Kontrola zda se data uložila
 
-        await chrome.storage.local.set({ vaultData: data });
-        document.getElementById("loading").classList.add("hidden");
-        document.getElementById("site").value = "";
+        await chrome.storage.local.set({ vaultData: data }); //Uložení dat do lokálního úložiště
+        document.getElementById("loading").classList.add("hidden"); //Skrytí načítání
+        document.getElementById("site").value = ""; //Vymazání dat z formuláře
         document.getElementById("login").value = "";
         document.getElementById("pass").value = "";
-        printList();
+        printList(); //Zobrazení dat v seznamu
     } catch (error) {
         document.getElementById("loading").classList.add("hidden");
         alert(error.message);
     }
 };
 
-document.getElementById("btn-logout").onclick = async () => {
+document.getElementById("btn-logout").onclick = async () => { //Ukončení relace a vymazání dat z RAM a lokálního úložiště
     sessionMasterKey = null;
     await chrome.storage.local.clear();
     document.getElementById("screen-vault").classList.add("hidden");
