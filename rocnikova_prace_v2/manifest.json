@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "FoxPass",
-  "version": "2.4",
-  "description": "symetricaly encrypted password manager extension for firefox browser",
+  "version": "2.5",
+  "description": "Symmetrically encrypted password manager extension for Firefox browser",
   "permissions": [
     "storage"
   ],
